@@ -36,4 +36,4 @@ WHERE
     istats.database_id = DB_ID()
     and dbindexes.[name] is not null
 ORDER BY 
-    istats.avg_fragmentation_in_percent desc
+    istats.avg_fragmentation_in_percent desc 

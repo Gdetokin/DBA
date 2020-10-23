@@ -1,0 +1,39 @@
+/*
+    Script      : lista_indexes.sql
+    Propósito   : Lista todos os índices e sua porcentagem de fragmentação
+*/
+
+use [DATABASE_NAME]
+go
+
+SELECT 
+    dbschemas.[name]                            as 'Schema'
+   ,dbtables.[name]                             as 'Table'
+   ,dbindexes.[name]                            as 'Index'
+   ,istats.alloc_unit_type_desc                 as 'Aloc Unit Type'
+   ,REPLACE(CONVERT(VARCHAR, istats.avg_fragmentation_in_percent),'.', ',') as 'Avg Frag %'
+   ,istats.page_count                           as 'Page Count'
+   ,CASE 
+		WHEN istats.avg_fragmentation_in_percent =  0  THEN null
+		WHEN istats.avg_fragmentation_in_percent >  35 THEN 'REBUILD' 
+		WHEN istats.avg_fragmentation_in_percent <= 35 THEN 'REORGANIZE'
+	END AS [Action]
+   ,CASE 
+		WHEN istats.avg_fragmentation_in_percent =  0  THEN null
+		WHEN istats.avg_fragmentation_in_percent >  35 THEN 'ALTER INDEX ' +  dbindexes.[name] + ' ON ' + dbtables.[name] + ' REBUILD;'
+		WHEN istats.avg_fragmentation_in_percent <= 35 THEN 'ALTER INDEX ' +  dbindexes.[name] + ' ON ' + dbtables.[name] + ' REORGANIZE;'
+	END AS [SCRIPT]
+FROM 
+    sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, NULL) AS istats
+    INNER JOIN sys.tables 		dbtables 
+        on dbtables.[object_id] = istats.[object_id]
+    INNER JOIN sys.schemas 		dbschemas 
+        on dbtables.[schema_id] = dbschemas.[schema_id]
+    INNER JOIN sys.indexes AS 	dbindexes 
+        ON dbindexes.[object_id] = istats.[object_id]
+        AND istats.index_id = dbindexes.index_id
+WHERE 
+    istats.database_id = DB_ID()
+    and dbindexes.[name] is not null
+ORDER BY 
+    istats.avg_fragmentation_in_percent desc
